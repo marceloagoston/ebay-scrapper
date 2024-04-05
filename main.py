@@ -4,6 +4,21 @@ import openpyxl
 
 from datetime import datetime
 
+def get_detail_product(target_url):
+
+    url = target_url
+    detail_page = requests.get(url)
+    detail_soup = BeautifulSoup(detail_page.content, 'html.parser')
+
+    specification_title = detail_soup.find_all("dt", class_="ux-labels-values__labels")
+    specification_value = detail_soup.find_all("dd", class_="ux-labels-values__values")
+    
+    product_details = []
+    for index, value in enumerate(specification_title):
+        product_details.append((value.text, specification_value[index].text))
+
+    return product_details
+
 def get_page_elements(p):
     prod = p.find_all("div", class_="s-item__wrapper clearfix")
     data = []
@@ -27,6 +42,7 @@ def get_page_elements(p):
     return data
 
 
+print("Starting process")
 # Create a new Workbook
 workbook = openpyxl.Workbook()
 
@@ -68,12 +84,41 @@ try:
 except:
     print('Error: Bad URL')
 
+cols = ["Product Name", "URL", "Sold Price", "Date"]
 
-worksheet.append(["Product Name", "URL", "Sold Price", "Date"])
+final_data = []
+new_cols = []
+product_detail = []
+cont = 0
+for row_data in data[:62]:
+    cont += 1
+    print(f"Request No. {cont} to: {row_data[1]}")
+    product_detail_req = get_detail_product(row_data[1])
 
-for row_data in data:
-    worksheet.append(row_data)
+    # Armar una lista de listas, cada elemento de la lista grande corresponde a un producto
+    product_detail.append(product_detail_req)
+    
+    for nc in product_detail_req:
+        if nc[0] not in cols:
+            cols.append(nc[0])
+
+item_len = len(data[0])
+difference = len(cols) - item_len
+
+empty_spaces = ['-'] * difference
+
+worksheet.append(cols)
+
+for index, value in enumerate(data[:62]):
+    values = value + empty_spaces
+    for ix, det in enumerate(product_detail[index]):
+        if det[0] in cols:
+            position = cols.index(det[0])
+            values[position] = det[1]
+
+    worksheet.append(values)
 
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
 workbook.save(f"output_{current_datetime}.xlsx")
+
+print("End process")
